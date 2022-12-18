@@ -15,7 +15,7 @@ fn main() {
 
     let socket = setup_socket(format!("{ip}:6980"));
     println!("Sending to {} on Stream1", socket.peer_addr().unwrap());
-    let mut idx = 0;
+    let mut idx: u32 = 0;
 
     let _stream = setup_mic(move |samples: &[i16]| {
         let bytes: Vec<u8> = samples.iter().flat_map(|e| e.to_le_bytes()).collect();
@@ -30,7 +30,7 @@ fn main() {
                 return;
             }
 
-            idx += 1;
+            idx = idx.wrapping_add(1);
             let mut packet = stream::generate_header(
                 idx,
                 VBANResolution::S16,
