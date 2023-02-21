@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cpal = "0.14.2"
-deku = "0.15.0"
-num_enum = "0.5.7"
+cpal = "0.15.0"
+deku = "0.15.1"
+num_enum = "0.5.10"

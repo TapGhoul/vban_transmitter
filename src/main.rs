@@ -1,7 +1,7 @@
 use crate::stream::resolution::VBANResolution;
 use crate::stream::setup_socket;
 use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{BufferSize, Sample, SampleRate, Stream, StreamConfig};
+use cpal::{BufferSize, SampleRate, SizedSample, Stream, StreamConfig};
 use std::env::args;
 use std::mem::size_of_val;
 use std::process::exit;
@@ -62,11 +62,10 @@ fn get_ip() -> String {
 fn setup_mic<T, D>(mut cb: D) -> Stream
 where
     D: FnMut(&[T]) + Send + 'static,
-    T: Sample,
+    T: SizedSample,
 {
     let host = cpal::default_host();
     let mic = host.default_input_device().unwrap();
-    let speaker = host.default_output_device().unwrap();
 
     mic.build_input_stream(
         &StreamConfig {
@@ -76,6 +75,7 @@ where
         },
         move |data: &[T], _| cb(data),
         |err| panic!("{err:?}"),
+        None,
     )
     .unwrap()
 }
