@@ -5,8 +5,7 @@ use cpal::{BufferSize, SampleRate, SizedSample, Stream, StreamConfig};
 use std::env::args;
 use std::mem::size_of_val;
 use std::process::exit;
-use std::thread::sleep;
-use std::time::Duration;
+use std::thread::park;
 
 mod stream;
 
@@ -42,7 +41,7 @@ fn main() {
     });
 
     loop {
-        sleep(Duration::from_secs(30));
+        park();
     }
 }
 
