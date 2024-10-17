@@ -55,7 +55,6 @@ fn main() {
     let _speaker = {
         let mut is_warming_buffer = true;
         setup_speaker(move |data: &mut [i16]| {
-            // Update warming buffer state
             if is_warming_buffer && consumer.occupied_len() >= data.len() {
                 println!("Buffer warmed!");
                 is_warming_buffer = false;
