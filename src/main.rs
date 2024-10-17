@@ -77,16 +77,23 @@ fn main() {
     loop {
         let (len, _) = socket.recv_from(&mut buf).unwrap();
         // TODO: Check for discontinuity of packets, we are using UDP here!
-        let Some((sample_count, buf)) = try_parse_header(&stream_name, &buf[..len]) else {
+        let Some((_frame, sample_count, buf)) = try_parse_header(&stream_name, &buf[..len]) else {
             continue;
         };
 
-        // TODO: check for overflow
-        producer.push_iter(
+        let added_count = producer.push_iter(
             buf.chunks_exact(2)
-                .take(sample_count as usize + 1)
                 .map(|e| i16::from_le_bytes(e.try_into().unwrap())),
         );
+
+        // VBAN 0-based sample count * channels
+        let expected_count = (sample_count as usize + 1) * 2;
+
+        if added_count > expected_count {
+            println!("WARN: Buffer Overrun");
+        } else if added_count < expected_count {
+            println!("WARN: VBAN protocol violation - not enough data!");
+        }
     }
 }
 

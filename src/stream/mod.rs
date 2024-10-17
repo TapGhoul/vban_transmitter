@@ -52,7 +52,10 @@ macro_rules! check {
     };
 }
 
-pub fn try_parse_header<'a>(stream_name: &'a StreamName, buf: &'a [u8]) -> Option<(u32, &'a [u8])> {
+pub fn try_parse_header<'a>(
+    stream_name: &'a StreamName,
+    buf: &'a [u8],
+) -> Option<(u32, u8, &'a [u8])> {
     let ((buf, bit_offset), header) = VBANHeader::from_bytes((buf, 0)).unwrap();
 
     check!(bit_offset, 0, "bit offset");
@@ -64,7 +67,7 @@ pub fn try_parse_header<'a>(stream_name: &'a StreamName, buf: &'a [u8]) -> Optio
     check!(header.rate, VBANSampleRate::Rate48000, "sample rate");
     check!(header.format_bit, VBANResolution::S16, "format");
 
-    Some((header.frame, buf))
+    Some((header.frame, header.sample_count, buf))
 }
 
 pub fn generate_sin(frame_start: u32, buf: &mut Vec<u8>) {
