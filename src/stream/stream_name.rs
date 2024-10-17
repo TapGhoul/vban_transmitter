@@ -1,7 +1,8 @@
 use deku::prelude::*;
+use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Debug, DekuRead, DekuWrite)]
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Clone)]
 #[repr(transparent)]
 pub struct StreamName([u8; 16]);
 
@@ -18,22 +19,17 @@ impl TryFrom<String> for StreamName {
 
     fn try_from(name: String) -> Result<Self, Self::Error> {
         if !name.is_ascii() {
-            return Err(DekuError::InvalidParam(String::from("name is not ASCII")));
+            return Err(DekuError::InvalidParam(Cow::from("name is not ASCII")));
         }
         if name.len() > 16 {
-            return Err(DekuError::InvalidParam(String::from(
-                "name is longer than 16",
-            )));
+            return Err(DekuError::InvalidParam(Cow::from("name is longer than 16")));
         }
 
-        let mut buf = name.into_bytes();
-        buf.resize(16, 0);
+        let mut name = name.into_bytes();
+        name.resize(16, 0);
+        let buf = name.try_into().unwrap();
 
-        let v = buf
-            .try_into()
-            .map_err(|_| DekuError::Unexpected(String::from("vec len != 16")))?;
-
-        Ok(Self(v))
+        Ok(Self(buf))
     }
 }
 
@@ -42,7 +38,7 @@ impl TryInto<String> for StreamName {
 
     fn try_into(self) -> Result<String, Self::Error> {
         String::from_utf8(self.0.into())
-            .map_err(|_| DekuError::Parse(String::from("invalid utf-8 string")))
+            .map_err(|_| DekuError::Parse(Cow::from("invalid utf-8 string")))
     }
 }
 

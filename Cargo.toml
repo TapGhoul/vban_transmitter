@@ -1,11 +1,12 @@
 [package]
-name = "vban_transmitter"
+name = "vban_transceiver"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cpal = "0.15.0"
-deku = "0.15.1"
-num_enum = "0.5.10"
+cpal = "0.15.3"
+deku = "0.18.1"
+num_enum = "0.7.3"
+ringbuf = "0.4.7"
