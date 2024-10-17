@@ -60,6 +60,8 @@ fn main() {
                 is_warming_buffer = false;
             } else if !is_warming_buffer && consumer.occupied_len() < data.len() {
                 println!("WARN: Buffer underrun");
+                // Avoid a screech
+                data.fill(0);
                 is_warming_buffer = true;
             }
 
@@ -76,7 +78,6 @@ fn main() {
         let (len, _) = socket.recv_from(&mut buf).unwrap();
         // TODO: Check for discontinuity of packets, we are using UDP here!
         let Some((sample_count, buf)) = try_parse_header(&stream_name, &buf[..len]) else {
-            println!("WARN: Invalid packet");
             continue;
         };
 

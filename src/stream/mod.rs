@@ -46,7 +46,7 @@ pub fn generate_header(
 macro_rules! check {
     ($lhs:expr, $rhs:expr, $err:literal) => {
         if $lhs != $rhs {
-            println!("WARN: {}", $err);
+            println!("WARN: Bad header: {}", $err);
             return None;
         }
     };
@@ -55,14 +55,14 @@ macro_rules! check {
 pub fn try_parse_header<'a>(stream_name: &'a StreamName, buf: &'a [u8]) -> Option<(u32, &'a [u8])> {
     let ((buf, bit_offset), header) = VBANHeader::from_bytes((buf, 0)).unwrap();
 
-    check!(bit_offset, 0, "bad bit offset");
-    check!(&header.stream_name, stream_name, "bad stream name");
-    check!(header.sub_proto, 0, "bad subproto");
-    check!(header.codec, 0, "bad codec");
+    check!(bit_offset, 0, "bit offset");
+    check!(&header.stream_name, stream_name, "stream name");
+    check!(header.sub_proto, 0, "subproto");
+    check!(header.codec, 0, "codec");
     // 2 channels
-    check!(header.channel_count, 1, "bad channel count");
-    check!(header.rate, VBANSampleRate::Rate48000, "bad sample rate");
-    check!(header.format_bit, VBANResolution::S16, "bad format");
+    check!(header.channel_count, 1, "channel count");
+    check!(header.rate, VBANSampleRate::Rate48000, "sample rate");
+    check!(header.format_bit, VBANResolution::S16, "format");
 
     Some((header.frame, buf))
 }
