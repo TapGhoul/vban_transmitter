@@ -59,8 +59,8 @@ pub fn try_parse_header<'a>(
     let ((buf, bit_offset), header) = VBANHeader::from_bytes((buf, 0)).unwrap();
 
     check!(bit_offset, 0, "bit offset");
-    check!(&header.stream_name, stream_name, "stream name");
     check!(header.sub_proto, 0, "subproto");
+    check!(&header.stream_name, stream_name, "stream name");
     check!(header.codec, 0, "codec");
     // 2 channels
     check!(header.channel_count, 1, "channel count");
