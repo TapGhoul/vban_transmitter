@@ -6,10 +6,14 @@ use cpal::{BufferSize, SampleRate, SizedSample, Stream, StreamConfig};
 use ringbuf::traits::{Consumer, Observer, Producer, Split};
 use ringbuf::HeapRb;
 use std::env::args;
+use std::io::{Cursor, Seek};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::process::exit;
 
 mod stream;
+
+type SampleFormat = i16;
+const SAMPLE_BYTE_SIZE: usize = size_of::<SampleFormat>();
 
 fn main() {
     let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 6980)).unwrap();
@@ -22,30 +26,49 @@ fn main() {
 
         let stream_name = stream_name.clone();
         let socket = socket.try_clone().unwrap();
-        let mut idx: u32 = 0;
 
-        setup_mic(move |samples: &[i16]| {
-            let bytes: Vec<u8> = samples.iter().flat_map(|e| e.to_le_bytes()).collect();
-            let sample_byte_len: usize = size_of_val(&samples[0]);
+        let mut idx: u32 = 0;
+        let mut send_buf = Cursor::new([0u8; 1436]);
+
+        setup_mic(move |samples: &[SampleFormat]| {
             // Max bytes: 1436
             // Max samples: 256
-            let chunk_size = 1436.min(256 * sample_byte_len);
+            let chunk_size = (1436 / SAMPLE_BYTE_SIZE).min(256);
 
-            for chunk in bytes.chunks(chunk_size) {
+            for chunk in samples.chunks(chunk_size) {
                 let sample_count = chunk.len();
-                if sample_count == 0 {
-                    return;
-                }
 
                 idx = idx.wrapping_add(1);
-                let mut packet = stream::generate_header(
+                send_buf.rewind().unwrap();
+
+                stream::write_header(
+                    &mut send_buf,
+                    // TODO: Avoid a clone here
                     stream_name.clone(),
                     idx,
                     VBANResolution::S16,
-                    ((chunk.len() / sample_byte_len) - 1) as u8,
+                    (sample_count - 1) as u8,
                 );
-                packet.extend(chunk);
-                socket.send_to(&packet, addr).unwrap();
+
+                // Realistically, this doesn't actually need a cursor - VBAN's header size is fixed.
+                // But ay, why not. I can change it later if I want.
+                let curr_offset = send_buf.position() as usize;
+                let packet_len = curr_offset + (sample_count * SAMPLE_BYTE_SIZE);
+
+                let sample_dst_buf = &mut send_buf.get_mut()[curr_offset..packet_len];
+
+                // If this is ever an issue, we could replace it with the unsafe "ptr::copy_nonoverlapping()"
+                // and just do the length checking ahead of time rather than in each iteration (as per how this works currently)
+                for (src, dst) in chunk
+                    .into_iter()
+                    .map(|e| e.to_le_bytes())
+                    .zip(sample_dst_buf.chunks_mut(SAMPLE_BYTE_SIZE))
+                {
+                    dst.copy_from_slice(src.as_slice())
+                }
+
+                let final_buf = &send_buf.get_ref()[..packet_len];
+                socket.send_to(final_buf, addr).unwrap();
             }
         })
     };
@@ -74,21 +97,34 @@ fn main() {
     };
 
     let mut buf = [0u8; 1436];
+    let mut next_expected_frame = None;
+
     loop {
         let (len, _) = socket.recv_from(&mut buf).unwrap();
-        // TODO: Check for discontinuity of packets, we are using UDP here!
-        let Some((_frame, sample_count, buf)) = try_parse_header(&stream_name, &buf[..len]) else {
+        let Some((frame, sample_count, buf)) = try_parse_header(&stream_name, &buf[..len]) else {
             continue;
         };
 
-        let added_count = producer.push_iter(
-            buf.chunks_exact(2)
-                .map(|e| i16::from_le_bytes(e.try_into().unwrap())),
-        );
+        let expected_frame = next_expected_frame.unwrap_or(frame);
+        if expected_frame != frame {
+            println!("WARN: Discontinuity: expected {expected_frame}, got {frame}");
+        }
+        next_expected_frame = Some(frame.wrapping_add(1));
 
-        // VBAN 0-based sample count * channels
-        let expected_count = (sample_count as usize + 1) * 2;
+        let chunks = buf.chunks_exact(SAMPLE_BYTE_SIZE);
+        if !chunks.remainder().is_empty() {
+            println!(
+                "WARN: VBAN protocol violation - buffer is not a multiple of sample byte size!"
+            );
+        }
 
+        // TODO: If all samples are 0, don't write - might help with latency? (we don't have an issue with latency atm)
+
+        let added_count =
+            producer.push_iter(chunks.map(|e| SampleFormat::from_le_bytes(e.try_into().unwrap())));
+
+        // channels = 2
+        let expected_count = sample_count * 2;
         if added_count > expected_count {
             println!("WARN: Buffer Overrun");
         } else if added_count < expected_count {
